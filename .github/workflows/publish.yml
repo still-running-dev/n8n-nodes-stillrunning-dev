@@ -80,6 +80,11 @@ jobs:
         with:
           node-version: 'lts/*'
           cache: 'npm'
+          registry-url: https://registry.npmjs.org
+
+      - name: Update npm
+        # npm trusted publishing needs npm 11.5.1+, which the Node.js-bundled npm may not be.
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: 'npm ci'

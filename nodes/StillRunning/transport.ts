@@ -10,7 +10,7 @@ export interface StillRunningCredentialsI {
 	baseUrl: string;
 }
 
-const DEFAULT_BASE_URL = 'https://stillrunning.dev/api/v1';
+const DEFAULT_BASE_URL = 'https://api.stillrunning.dev/api/v1';
 
 /**
  * Returns the attached `stillRunningApi` credential, or `undefined` if the

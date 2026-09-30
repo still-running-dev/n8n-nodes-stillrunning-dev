@@ -69,6 +69,26 @@ export const reportHeartbeatDescription: INodeProperties[] = [
 			'An idempotency key — resending the same value updates the same run instead of creating ' +
 			'a duplicate. Defaults to this execution\'s own id.',
 	},
+	{
+		displayName: 'Additional Fields',
+		name: 'additionalFields',
+		type: 'collection',
+		placeholder: 'Add Field',
+		default: {},
+		displayOptions: { show: showOnlyForReportHeartbeat },
+		options: [
+			{
+				displayName: 'Items Processed',
+				name: 'itemsProcessed',
+				type: 'number',
+				typeOptions: { minValue: 0, numberPrecision: 0 },
+				default: 0,
+				description:
+					'How many items this run wrote, e.g. {{ $(\'Append Row\').isExecuted ? $(\'Append Row\').all().length : 0 }}. ' +
+					'A run that writes 0 when it usually writes more raises a zero-write alert.',
+			},
+		],
+	},
 ];
 
 export async function executeReportHeartbeat(
@@ -88,6 +108,21 @@ export async function executeReportHeartbeat(
 	const finishedAt = this.getNodeParameter('finishedAt', itemIndex, '') as string;
 	const errorMessage = this.getNodeParameter('errorMessage', itemIndex, '') as string;
 	const runId = this.getNodeParameter('runId', itemIndex, '') as string;
+	const { itemsProcessed } = this.getNodeParameter('additionalFields', itemIndex, {}) as {
+		itemsProcessed?: number;
+	};
+
+	// An expression can produce anything; the API only takes a whole number from 0 up.
+	if (
+		itemsProcessed !== undefined &&
+		!(Number.isSafeInteger(itemsProcessed) && itemsProcessed >= 0)
+	) {
+		throw new NodeOperationError(
+			this.getNode(),
+			`"Items Processed" must be a whole number of 0 or more, got ${String(itemsProcessed)}.`,
+			{ itemIndex },
+		);
+	}
 
 	const body: IDataObject = {
 		workflowRemoteId: this.getNodeParameter('workflowRemoteId', itemIndex) as string,
@@ -97,6 +132,7 @@ export async function executeReportHeartbeat(
 		...(finishedAt ? { finishedAt } : {}),
 		...(errorMessage ? { errorMessage } : {}),
 		...(runId ? { runId } : {}),
+		...(itemsProcessed !== undefined ? { itemsProcessed } : {}),
 	};
 
 	return stillRunningApiRequest.call(this, itemIndex, 'POST', '/external/heartbeats', body);

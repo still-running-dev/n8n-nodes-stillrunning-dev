@@ -10,7 +10,7 @@ export class StillRunningApi implements ICredentialType {
 
 	displayName = 'Still Running API';
 
-	documentationUrl = 'https://stillrunning.dev/docs/n8n';
+	documentationUrl = 'https://github.com/still-running-dev/n8n-nodes-stillrunning-dev#readme';
 
 	icon = { light: 'file:../nodes/StillRunning/stillRunning.light.svg', dark: 'file:../nodes/StillRunning/stillRunning.dark.svg' } as const;
 
@@ -32,7 +32,7 @@ export class StillRunningApi implements ICredentialType {
 			displayName: 'Base URL',
 			name: 'baseUrl',
 			type: 'string',
-			default: 'https://stillrunning.dev/api/v1',
+			default: 'https://api.stillrunning.dev/api/v1',
 			description: 'Only change this for a self-hosted or staging stillrunning.dev instance.',
 		},
 	];
