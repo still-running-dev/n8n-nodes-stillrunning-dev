@@ -28,7 +28,7 @@ Checks a workflow export for silent-failure risks and returns the findings.
 - Runs **locally**, with nothing sent over the network, when no Still Running API credential is attached to the node — this is the only operation that works with zero setup.
 - Runs **via stillrunning.dev** when a credential is attached, using the same analysis engine.
 
-The response always includes a `mode` field (`local` or `remote`) so you can tell which path ran.
+The response always includes a `mode` field (`local` or `remote`) so you can tell which path ran. Both return the same `findings` and `schemaVersion`. Local mode also returns the rest of the engine's result (`protections`, `stats`, `parseNotes` and so on); remote mode returns only those two, plus `skippedReason`, which is set when stillrunning.dev couldn't run the analysis and `findings` is `null`.
 
 ### Report Heartbeat
 

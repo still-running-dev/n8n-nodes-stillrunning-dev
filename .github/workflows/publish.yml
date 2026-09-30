@@ -78,13 +78,15 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 'lts/*'
+          node-version: 24
           cache: 'npm'
           registry-url: https://registry.npmjs.org
 
       - name: Update npm
         # npm trusted publishing needs npm 11.5.1+, which the Node.js-bundled npm may not be.
-        run: npm install -g npm@latest
+        # Pinned to a major, not `latest`: npm 12 dropped Node 20, and `npm@latest` on a Node
+        # it doesn't support fails right here (the engine repo's v2.2.0 release did).
+        run: npm install -g npm@11
 
       - name: Install dependencies
         run: 'npm ci'

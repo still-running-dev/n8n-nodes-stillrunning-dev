@@ -4,6 +4,7 @@ import type {
 	IHttpRequestMethods,
 	IHttpRequestOptions,
 } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
 
 export interface StillRunningCredentialsI {
 	apiKey: string;
@@ -34,7 +35,11 @@ export async function getStillRunningCredentials(
 	}
 }
 
-/** Thin wrapper — every call here mirrors what a declarative `routing.request` block would do. */
+/**
+ * Thin wrapper — every call here mirrors what a declarative `routing.request`
+ * block would do, plus one step: the API wraps every answer as
+ * `{ data, httpStatus, frontFacingMessage }`, and the node outputs `data`.
+ */
 export async function stillRunningApiRequest(
 	this: IExecuteFunctions,
 	itemIndex: number,
@@ -53,9 +58,24 @@ export async function stillRunningApiRequest(
 		...(body ? { body } : {}),
 	};
 
-	return (await this.helpers.httpRequestWithAuthentication.call(
+	const response = (await this.helpers.httpRequestWithAuthentication.call(
 		this,
 		'stillRunningApi',
 		options,
-	)) as IDataObject;
+	)) as { data?: unknown } | null;
+
+	const data = response?.data;
+	if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+		// Most likely a Base URL that points somewhere other than the API.
+		throw new NodeOperationError(
+			this.getNode(),
+			`The answer from ${baseURL} isn't a stillrunning.dev API response.`,
+			{
+				itemIndex,
+				description: `Check the Still Running API credential's Base URL. The default is ${DEFAULT_BASE_URL}.`,
+			},
+		);
+	}
+
+	return data as IDataObject;
 }

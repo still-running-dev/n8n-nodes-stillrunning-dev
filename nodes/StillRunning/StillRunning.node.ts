@@ -32,7 +32,10 @@ export class StillRunning implements INodeType {
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"]}}',
-		description: 'Integrates with stillrunning.dev — automation reliability monitoring for n8n',
+		// An integration with a third-party service, worded on purpose: n8n may reject a node
+		// that reads as monitoring or analytics, which compete with its paid Insights.
+		description:
+			'Integrates with stillrunning.dev: analyse a workflow export, report a run, read a workflow status',
 		defaults: {
 			name: 'Still Running',
 		},

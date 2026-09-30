@@ -1,7 +1,7 @@
 /**
  * GENERATED FILE — DO NOT EDIT BY HAND.
  *
- * Bundled from @still-running/health-check@2.1.0 (pinned
+ * Bundled from @still-running/health-check@2.3.0 (pinned
  * exact in package.json's devDependencies — never a range, never a
  * workspace link) by scripts/vendor-health-check.mjs. Regenerate with
  * `node scripts/vendor-health-check.mjs` after bumping that pin.
@@ -233,7 +233,16 @@ var require_providers = __commonJS({
     exports.STATIC_KEY_HINTS = exports.PROVIDERS = void 0;
     exports.resolveProvider = resolveProvider;
     exports.guessAuthKind = guessAuthKind;
-    exports.PROVIDERS = [
+    var DAY = 86400;
+    function deepFreeze(value) {
+      if (value && typeof value === "object") {
+        for (const v of Object.values(value))
+          deepFreeze(v);
+        Object.freeze(value);
+      }
+      return value;
+    }
+    exports.PROVIDERS = deepFreeze([
       {
         id: "google",
         displayName: "Google",
@@ -258,6 +267,8 @@ var require_providers = __commonJS({
             condition: 'The Google Cloud project behind this connection has its OAuth consent screen set to "Testing" with an External user type',
             certainty: "conditional",
             window: "7 days",
+            windowSeconds: 7 * DAY,
+            countsFrom: "issued",
             detail: "Google issues a refresh token that expires 7 days after consent. When it dies the platform gets invalid_grant, the trigger stops firing, and nothing throws a run-level error because there is no run.",
             howToCheck: 'Google Cloud Console -> APIs & Services -> OAuth consent screen. If Publishing status says "Testing", this connection dies every 7 days. If it says "In production", it does not.'
           },
@@ -265,6 +276,8 @@ var require_providers = __commonJS({
             condition: "The consent screen is published to production and verified",
             certainty: "conditional",
             window: "indefinite, with five exceptions",
+            windowSeconds: null,
+            countsFrom: null,
             detail: "Effectively permanent unless: the token goes unused for six months, the user revokes access, the user changes their password while Gmail scopes are granted, the per-user token cap is exceeded, or the app loses verification for sensitive scopes.",
             howToCheck: "The six-month rule matters here: a workflow that stops running also stops refreshing, so a quiet workflow eventually becomes a dead credential."
           }
@@ -298,18 +311,24 @@ var require_providers = __commonJS({
             condition: "Normal case \u2014 the workflow runs at least every 90 days",
             certainty: "certain",
             window: "effectively indefinite",
+            windowSeconds: null,
+            countsFrom: null,
             detail: "Microsoft refresh tokens default to a 90-day inactivity limit and replace themselves every time they are used. A workflow that runs daily keeps resetting the clock, so this is lower risk than Google."
           },
           {
             condition: "The workflow stops running for 90 days",
             certainty: "certain",
             window: "90 days of inactivity",
+            windowSeconds: 90 * DAY,
+            countsFrom: "last-use",
             detail: "The refresh token expires from disuse. Note the trap: a workflow that already went quiet for another reason quietly becomes unrecoverable too, so a short outage turns into a manual re-auth."
           },
           {
             condition: "The tenant applies a Conditional Access sign-in frequency policy",
             certainty: "conditional",
             window: "whatever the policy says",
+            windowSeconds: null,
+            countsFrom: null,
             detail: "Since January 2021 refresh lifetimes are no longer configurable through token lifetime policies, but Conditional Access sign-in frequency still forces re-authentication on a schedule the client cannot see.",
             howToCheck: "Ask the tenant admin whether a sign-in frequency policy applies to this app. It is not visible from the automation side."
           }
@@ -335,6 +354,8 @@ var require_providers = __commonJS({
             condition: "The token was copied from the Meta app dashboard for testing",
             certainty: "conditional",
             window: "under 24 hours",
+            windowSeconds: DAY,
+            countsFrom: "issued",
             detail: "Temporary access tokens expire in less than a day. Anyone who set this up while testing and never went back has a workflow that died the next morning.",
             howToCheck: 'If the token came from the "Temporary access token" box on the app dashboard, it is already gone. Only a System User token survives.'
           },
@@ -342,6 +363,8 @@ var require_providers = __commonJS({
             condition: "A System User token was generated with a 60-day expiry",
             certainty: "conditional",
             window: "60 days",
+            windowSeconds: 60 * DAY,
+            countsFrom: "issued",
             detail: "Meta lets you pick the expiry when generating a System User token. 60 days is the common choice and there is no warning before it lapses.",
             howToCheck: "Meta Business Settings -> Users -> System Users -> your user -> the token list shows the expiry you chose."
           },
@@ -349,6 +372,8 @@ var require_providers = __commonJS({
             condition: "A System User token was generated with no expiry",
             certainty: "conditional",
             window: "never",
+            windowSeconds: null,
+            countsFrom: null,
             detail: "Permanent until someone revokes it manually."
           }
         ],
@@ -358,7 +383,7 @@ var require_providers = __commonJS({
         ],
         complaintLogRows: [13]
       }
-    ];
+    ]);
     exports.STATIC_KEY_HINTS = [
       "apikey",
       "api",
@@ -435,7 +460,8 @@ var require_others = __commonJS({
                 ...provider.rules.map((r) => `- ${r.condition}: ${r.window}. ${r.detail}`)
               ].join("\n"),
               howToCheck: ((_b = shortest == null ? void 0 : shortest.howToCheck) != null ? _b : (_a = conditional[0]) == null ? void 0 : _a.howToCheck) || void 0,
-              sources: provider.sources
+              // A copy: the table is frozen and shared by every call.
+              sources: [...provider.sources]
             });
           } else if (cred.authKind === "oauth2") {
             seen.add(key);
@@ -817,15 +843,25 @@ var require_n8n = __commonJS({
       }
       return { kind: "unknown", description: "no trigger found", intervalSeconds: null, expectedIntervalKnown: false };
     }
+    function errorOutputIndex(node, role) {
+      var _a;
+      if ((node == null ? void 0 : node.onError) !== "continueErrorOutput")
+        return null;
+      if (shortType((_a = node.type) != null ? _a : "") === "if")
+        return 2;
+      if (role === "write" || role === "read")
+        return 1;
+      return null;
+    }
     function isN8nWorkflow(raw) {
       return !!raw && typeof raw === "object" && Array.isArray(raw.nodes) && typeof raw.connections === "object";
     }
     function parseN8n(raw) {
-      var _a, _b, _c, _d;
+      var _a, _b, _c, _d, _e;
       const rawNodes = (_a = raw.nodes) != null ? _a : [];
       const parseNotes = [];
       const nodes = rawNodes.map((n) => {
-        var _a2, _b2, _c2, _d2, _e;
+        var _a2, _b2, _c2, _d2, _e2;
         const c = classify(n);
         const credentials = Object.entries((_a2 = n.credentials) != null ? _a2 : {}).map(([rawType, val]) => {
           var _a3, _b3;
@@ -839,7 +875,7 @@ var require_n8n = __commonJS({
         return {
           id: String((_b2 = n.id) != null ? _b2 : n.name),
           label: String((_d2 = (_c2 = n.name) != null ? _c2 : n.id) != null ? _d2 : "unnamed step"),
-          platformType: String((_e = n.type) != null ? _e : ""),
+          platformType: String((_e2 = n.type) != null ? _e2 : ""),
           role: c.role,
           writeKind: c.writeKind,
           writeTarget: c.writeTarget,
@@ -858,26 +894,27 @@ var require_n8n = __commonJS({
         var _a2;
         return [String(n.name), String((_a2 = n.id) != null ? _a2 : n.name)];
       }));
+      const roleByName = new Map(rawNodes.map((n, i) => [String(n.name), nodes[i].role]));
       const edges = [];
       for (const [sourceName, outputs] of Object.entries((_b = raw.connections) != null ? _b : {})) {
         const from = idByName.get(sourceName);
         if (!from)
           continue;
+        const sourceNode = rawNodes.find((n) => String(n.name) === sourceName);
+        const isIf = shortType((_c = sourceNode == null ? void 0 : sourceNode.type) != null ? _c : "") === "if";
+        const errorIndex = errorOutputIndex(sourceNode, roleByName.get(sourceName));
         for (const [channel, groups] of Object.entries(outputs != null ? outputs : {})) {
           (groups != null ? groups : []).forEach((group, outputIndex) => {
             (group != null ? group : []).forEach((conn) => {
-              var _a2;
               const to = idByName.get(String(conn == null ? void 0 : conn.node));
               if (!to)
                 return;
-              const sourceNode = rawNodes.find((n) => String(n.name) === sourceName);
-              const isIf = shortType((_a2 = sourceNode == null ? void 0 : sourceNode.type) != null ? _a2 : "") === "if";
-              edges.push({
-                from,
-                to,
-                channel: channel === "main" && isIf ? outputIndex === 0 ? "true" : "false" : channel,
-                gate: null
-              });
+              let edgeChannel = channel;
+              if (channel === "main" && outputIndex === errorIndex)
+                edgeChannel = "error";
+              else if (channel === "main" && isIf)
+                edgeChannel = outputIndex === 0 ? "true" : "false";
+              edges.push({ from, to, channel: edgeChannel, gate: null });
             });
           });
         }
@@ -887,13 +924,13 @@ var require_n8n = __commonJS({
         var _a2;
         return shortType((_a2 = n.type) != null ? _a2 : "") === "errorTrigger";
       });
-      const settings = (_c = raw.settings) != null ? _c : {};
+      const settings = (_d = raw.settings) != null ? _d : {};
       if (!raw.id && !raw.versionId) {
         parseNotes.push("This looks like a template export rather than a live workflow export.");
       }
       return {
         platform: "n8n",
-        name: String((_d = raw.name) != null ? _d : "Untitled workflow"),
+        name: String((_e = raw.name) != null ? _e : "Untitled workflow"),
         nodes,
         edges,
         triggerIds,
@@ -1053,17 +1090,24 @@ var require_make = __commonJS({
       }
       return last;
     }
-    function isMakeBlueprint(raw) {
-      if (!raw || typeof raw !== "object")
+    function unwrapApiResponse(raw) {
+      var _a;
+      const inner = raw == null ? void 0 : raw.response;
+      return inner && typeof inner === "object" && Array.isArray((_a = inner.blueprint) == null ? void 0 : _a.flow) ? inner : raw;
+    }
+    function isMakeBlueprint(input) {
+      if (!input || typeof input !== "object")
         return false;
+      const raw = unwrapApiResponse(input);
       if (Array.isArray(raw.flow))
         return true;
       if (raw.blueprint && Array.isArray(raw.blueprint.flow))
         return true;
       return false;
     }
-    function parseMake(raw) {
+    function parseMake(input) {
       var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+      const raw = unwrapApiResponse(input);
       const bp = (_a = raw.blueprint) != null ? _a : raw;
       const parseNotes = [];
       const acc = { nodes: [], edges: [] };
@@ -1114,8 +1158,9 @@ var require_make = __commonJS({
 var require_index = __commonJS({
   "node_modules/@still-running/health-check/dist/index.js"(exports) {
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.SCHEMA_VERSION = void 0;
+    exports.resolveProvider = exports.PROVIDERS = exports.SCHEMA_VERSION = void 0;
     exports.analyze = analyze;
+    exports.classifyNodes = classifyNodes;
     var model_js_1 = require_model();
     var zero_write_js_1 = require_zero_write();
     var others_js_1 = require_others();
@@ -1162,6 +1207,45 @@ var require_index = __commonJS({
         }
       };
     }
+    function classifyNodes(input) {
+      var _a;
+      const wf = parseWorkflow(input);
+      const alertIds = (0, zero_write_js_1.findAlertNodes)(wf);
+      const byId = new Map(wf.nodes.map((n) => [n.id, n]));
+      const next = /* @__PURE__ */ new Map();
+      for (const e of wf.edges) {
+        if (e.channel === "error")
+          continue;
+        next.set(e.from, [...(_a = next.get(e.from)) != null ? _a : [], e.to]);
+      }
+      const leadsOn = (id, seen) => {
+        var _a2;
+        return ((_a2 = next.get(id)) != null ? _a2 : []).some((to) => {
+          const n = byId.get(to);
+          if (!n || n.role === "note" || seen.has(to))
+            return false;
+          if (!n.disabled)
+            return true;
+          seen.add(to);
+          return leadsOn(to, seen);
+        });
+      };
+      return wf.nodes.map((n) => ({
+        id: n.id,
+        label: n.label,
+        role: n.role === "write" && alertIds.has(n.id) ? "alert" : n.role,
+        disabled: n.disabled,
+        terminal: !n.disabled && n.role !== "note" && !leadsOn(n.id, /* @__PURE__ */ new Set([n.id])),
+        credentials: n.credentials.map((c) => ({ ...c }))
+      }));
+    }
+    var providers_js_1 = require_providers();
+    Object.defineProperty(exports, "PROVIDERS", { enumerable: true, get: function() {
+      return providers_js_1.PROVIDERS;
+    } });
+    Object.defineProperty(exports, "resolveProvider", { enumerable: true, get: function() {
+      return providers_js_1.resolveProvider;
+    } });
   }
 });
 export default require_index();
