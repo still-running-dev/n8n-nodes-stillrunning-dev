@@ -52,8 +52,7 @@
 		"n8nNodesApiVersion": 1,
 		"strict": true,
 		"credentials": [
-			"dist/credentials/StillRunningApi.credentials.js",
-			"dist/credentials/StillRunningN8nApi.credentials.js"
+			"dist/credentials/StillRunningApi.credentials.js"
 		],
 		"nodes": [
 			"dist/nodes/StillRunning/StillRunning.node.js"

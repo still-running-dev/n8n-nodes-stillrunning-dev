@@ -47,16 +47,6 @@ export class StillRunning implements INodeType {
 				name: 'stillRunningApi',
 				required: false,
 			},
-			{
-				name: 'stillRunningN8nApi',
-				required: false,
-				displayOptions: {
-					show: {
-						operation: ['analyseWorkflow'],
-						inputSource: ['currentWorkflow'],
-					},
-				},
-			},
 		],
 		properties: [
 			{

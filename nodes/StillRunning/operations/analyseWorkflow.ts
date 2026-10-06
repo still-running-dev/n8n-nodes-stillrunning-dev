@@ -12,37 +12,21 @@ const showOnlyForAnalyseWorkflow = {
 	operation: ['analyseWorkflow'],
 };
 
+// There is deliberately no "fetch this workflow" input: that needs an n8n API
+// credential, which would be a second service in this package (n8n's review
+// asks for one). n8n's own n8n node (Workflow → Get) fetches a workflow, and
+// its output goes straight into Workflow JSON as {{ $json }}.
 export const analyseWorkflowDescription: INodeProperties[] = [
-	{
-		displayName: 'Input Source',
-		name: 'inputSource',
-		type: 'options',
-		noDataExpression: true,
-		displayOptions: { show: showOnlyForAnalyseWorkflow },
-		options: [
-			{
-				name: 'Workflow JSON',
-				value: 'workflowJson',
-				description: 'Paste or pass in a workflow (or Make blueprint) export',
-			},
-			{
-				name: 'Current Workflow',
-				value: 'currentWorkflow',
-				description: "Fetch this workflow's own definition via the n8n API",
-			},
-		],
-		default: 'workflowJson',
-	},
 	{
 		displayName: 'Workflow JSON',
 		name: 'workflowJson',
 		type: 'json',
 		default: '',
 		required: true,
-		displayOptions: {
-			show: { ...showOnlyForAnalyseWorkflow, inputSource: ['workflowJson'] },
-		},
-		description: 'The exported n8n workflow or Make blueprint JSON to analyse',
+		displayOptions: { show: showOnlyForAnalyseWorkflow },
+		description:
+			'The exported n8n workflow or Make blueprint JSON to analyse. For a workflow on this ' +
+			"instance, fetch it with n8n's own n8n node (Workflow → Get) and set this to {{ $json }}.",
 	},
 ];
 
@@ -57,12 +41,11 @@ export async function executeAnalyseWorkflow(
 	this: IExecuteFunctions,
 	itemIndex: number,
 ): Promise<IDataObject> {
-	const inputSource = this.getNodeParameter('inputSource', itemIndex) as string;
-
-	const workflowDefinition =
-		inputSource === 'currentWorkflow'
-			? await fetchCurrentWorkflowDefinition.call(this, itemIndex)
-			: parseWorkflowJsonParameter.call(this, this.getNodeParameter('workflowJson', itemIndex), itemIndex);
+	const workflowDefinition = parseWorkflowJsonParameter.call(
+		this,
+		this.getNodeParameter('workflowJson', itemIndex),
+		itemIndex,
+	);
 
 	const credentials = await getStillRunningCredentials.call(this, itemIndex);
 
@@ -79,30 +62,6 @@ export async function executeAnalyseWorkflow(
 	});
 
 	return { mode: 'remote', ...result };
-}
-
-async function fetchCurrentWorkflowDefinition(
-	this: IExecuteFunctions,
-	itemIndex: number,
-): Promise<IDataObject> {
-	const { id } = this.getWorkflow();
-
-	if (!id) {
-		throw new NodeOperationError(
-			this.getNode(),
-			'This workflow has no id yet — save it at least once before analysing it by id, ' +
-				'or switch Input Source to "Workflow JSON".',
-			{ itemIndex },
-		);
-	}
-
-	const response = await this.helpers.httpRequestWithAuthentication.call(this, 'stillRunningN8nApi', {
-		method: 'GET',
-		url: `/workflows/${id}`,
-		json: true,
-	});
-
-	return response as IDataObject;
 }
 
 function parseWorkflowJsonParameter(
